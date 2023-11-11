@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
-	-- main functions
+-- main functions
 
 function _init()
 	-- init music
@@ -18,6 +18,7 @@ function _update()
 	player_update()
 	bullet_update()
 	enemy_update()
+	power_up_update()
 	-- process collisions
 	bullet_cull()
 	enemy_coll_backs()
@@ -204,7 +205,8 @@ player={
 	pos={x=64,y=64},
 	health=3,
 	dir=0,
-	is_hit=false
+	is_hit=false,
+	sht_fwd=true
 }
 
 function player_update()
@@ -264,6 +266,15 @@ function player_update()
 			create_bullet(player.pos.x, player.pos.y, b_dir_b)
 			end
 	end
+	-- switch shooting direction
+	if btnp(5) then
+		if player.sht_fwd then
+			player.sht_fwd = false
+		else
+			player.sht_fwd = true
+		end
+	end
+	-- bomb use
 	-- player invul
 	player_invul_time -= clock.delta
 end
@@ -351,7 +362,7 @@ function bullet_update()
 			--collision
 			for ei=1, #enemies do
 			 local e = enemies[ei]
-			 if obj_collide(b, e) then
+			 if obj_collide(b, e)  and e.active then
 			 	b_cull_i=i
 			 end
 			end		
@@ -379,46 +390,68 @@ function bullet_cull()
 end
 
 --------------- power ups
--- power up types
--- health
--- bomb
 power_ups = {}
-
 ----- create power ups
 for i=1, 5 do
 	power_ups[#power_ups+1] = {
 		pos={x=0,y=0}, 
-		p_type="health/bomb",
-		active=true
+		p_type="",
+		active=false,
+		l_span=0
 	}
 end
 
 -- power up functions
-function create_power_up(_p_type, _pos)
-	for i=1, #power_ups do
-		local p = power_ups[i]
-		if p.active == false then
-			p.pos = {x=_pos.x, y=_pos.y}
-			p.active = false
-			p.p_type = _p_type
-			break
+-- spawning vars
+p_spn_rate = 10
+p_spn_timer = p_spn_rate
+p_spn_dist = 8*7
+p_l_span = 13
+function spn_p_ups_loop()
+	-- iterate timer
+	p_spn_timer -= clock.delta
+	-- if is time then spawn
+	if p_spn_timer < 0 then
+		p_spn_timer = p_spn_rate
+		for i=1, #power_ups do
+			local p = power_ups[i]
+			if p.active == false then
+				-- create position
+				local pos={
+					x=(((rnd()*2)-1)*p_spn_dist)+player.pos.x,
+					y=(((rnd()*2)-1)*p_spn_dist)+player.pos.y
+				}
+				-- choose type
+				local _type = "health"
+				if rnd() > 0.5 then _type ="bomb" end
+				-- create power up
+				p.pos = pos
+				p.active = true
+				p.p_type = _type
+				p.l_span = p_l_span
+				break
+			end
 		end
 	end
 end
 
-power_up_colls = {}
+p_up_colls = {}
 function power_up_update()
 	-- clear collbacks
 	p_up_colls = {}
+	-- spn power ups
+	spn_p_ups_loop()
 	-- main loop
 	for i=1, #power_ups do
 		local p = power_ups[i]
 		if p.active then
 			-- check collision
-			if obj_collide(player.pos, p.pos) then
-				power_up_colls[#power_up_colls+1] = p 
+			if obj_collide(player, p) then
+				p_up_colls[#p_up_colls+1] = p 
 			end
 			-- handle lifespan
+			p.l_span -= clock.delta
+			if p.l_span < 0 then p.active = false end
 		end
 	end
 end
@@ -429,7 +462,7 @@ function power_up_draw()
 		local p = power_ups[i]
 		if p.active then
 			local s = 114 -- change correct sprite
-			if p.type == "health" then
+			if p.p_type == "health" then
 				s = 115 -- change correct sprite
 			end
 			spr(s, p.pos.x, p.pos.y)
@@ -438,15 +471,28 @@ function power_up_draw()
 end
 
 function power_up_collbacks()
-	for i=1, #power_up_colls do
-		local p = power_up_colls[i]
-		
+	for i=1, #p_up_colls do
+		local p = p_up_colls[i]
+		log("col")
+		-- handle event
+		if p.p_type == "health" then
+			log("has health")
+			player.health += 1
+			-- prevent too much health
+			if player.health > 3 then player.health = 3 end
+		else
+			log("has bomb")
+		end
+		-- deactivate powerup
+		p.active = false
 	end
 end
 -->8
 -- enemies
+-- enemies has slow-tough and fast-weak types
 enemies={}
-enemy_spd= 60/100
+enemy_spd= 20/100
+enemy_spd_fast = enemy_spd*3
 -- start enemy pool
 for i=1, 20 do
 	enemies[#enemies+1]={
@@ -457,7 +503,8 @@ for i=1, 20 do
 	 is_hit=false,
 	 --props
 	 sprite=64,
-	 sprite_hit=65
+	 sprite_hit=65,
+	 is_fast=false
 	}
 end
 
@@ -466,6 +513,11 @@ function activate_enemies()
 	for i=1, #enemies do
 		local e = enemies[i]
 		if e.active != true then
+			-- pick enemy type
+			local _is_fast = true
+			if rnd() > 0.3 then
+			 _is_fast = false
+			end
 			-- create enemy position
 			local min_d = 8*2
 			local d = 8*4
@@ -480,7 +532,14 @@ function activate_enemies()
 			}	
 			e.pos = epos_scl
 			e.active = true
-			e.health =3
+			e.health = 9
+			e.sprite = 64
+			-- create faster enemies
+			if _is_fast then
+				e.is_fast = true
+				e.health = 3
+				e.sprite = 72
+			end
 			break
 		end
 	end
@@ -521,6 +580,9 @@ function enemy_update()
 	for i=1, #enemies do
 		local e = enemies[i]
 		if e.active then
+			-- handle speed
+			local e_spd = enemy_spd
+			if e.is_fast then e_spd = enemy_spd_fast end
 			-- reset hit sprite
 			e.is_hit = false
 			-- get direction
@@ -530,8 +592,8 @@ function enemy_update()
 			})
 			-- move in direction
 			e.pos={
-				x=e.pos.x+(dir.x*enemy_spd),
-				y=e.pos.y+(dir.y*enemy_spd)
+				x=e.pos.x+(dir.x*e_spd),
+				y=e.pos.y+(dir.y*e_spd)
 			}
 			-- flag for collision
 			for bi=1, #bullets do
