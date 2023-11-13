@@ -51,6 +51,8 @@ function _draw()
 	power_up_draw()
 	--ui
 	ui_player_health()
+	ui_player_bomb()
+	dr_score()
 	-- logging
 	log_draw()
 end
@@ -188,7 +190,7 @@ function norm_vec(vector)
 end
 
 function lerp(a, b, t)
-    return a + (b - a) * t
+ return a + (b - a) * t
 end
 
 
@@ -206,7 +208,9 @@ player={
 	health=3,
 	dir=0,
 	is_hit=false,
-	sht_fwd=true
+	sht_fwd=true,
+	sht_dir={},
+	bombs=2
 }
 
 function player_update()
@@ -239,25 +243,10 @@ function player_update()
 	-- shooting
 	if btn(4) then
 		if b_down_time < 0 then
+			-- handle bullet down time
 			b_down_time = b_rate
-			-- calc main bull directions
-			local bull_dir_x;
-			local bull_dir_y;
-			if player.dir == 0 then
-				bull_dir_x = -1
-				bull_dir_y = 0 
-			elseif player.dir == 1 then
-			 bull_dir_x = 1
-			 bull_dir_y = 0 	
-			elseif player.dir == 2 then
-				bull_dir_y = -1
-				bull_dir_x = 0
-			elseif player.dir == 3 then 
-				bull_dir_y = 1
-				bull_dir_x = 0
-			end
-			-- calc other bull directions
-			local b_dir = {x=bull_dir_x, y=bull_dir_y}
+			-- calc bullet directions
+			local b_dir = rot_vec(player.sht_dir, curr_ret_ang)
 			local b_dir_a = rot_vec(b_dir, deg2rad(2))
 			local b_dir_b = rot_vec(b_dir, deg2rad(-2))
 			-- create the bullets
@@ -270,8 +259,10 @@ function player_update()
 	if btnp(5) then
 		if player.sht_fwd then
 			player.sht_fwd = false
+			ret_ang = 0.5
 		else
 			player.sht_fwd = true
+			ret_ang = 0
 		end
 	end
 	-- bomb use
@@ -287,22 +278,32 @@ function player_draw()
 		spr(player.sprite, player.pos.x, player.pos.y)
 	end
 	-- draw reticle
-	local offset_x = 0
-	local offset_y = 0
-	if player.dir == 0 then
-		offset_x = -6
+	dr_ret()
+end
+-- draw reticle
+curr_ret_ang = 0
+ret_ang = 0
+function dr_ret()
+	-- get correct perpendicular angle
+	player.sht_dir = {x=0,y=0}
+	if (player.dir == 0) then
+		player.sht_dir.x = -1
 	elseif player.dir == 1 then
-		offset_x = 6
+		player.sht_dir.x = 1
+	elseif player.dir == 2 then
+		player.sht_dir.y = -1
+	else 
+		player.sht_dir.y = 1
 	end
-	if player.dir == 2 then
-		offset_y = -6
-	elseif player.dir == 3 then
-		offset_y = 6
-	end
+	-- lerp ret_ang
+	curr_ret_ang = lerp(curr_ret_ang, ret_ang, 0.6)
+	-- rotate vec 
+	local final_ret_vec = rot_vec(player.sht_dir, curr_ret_ang)
+	-- draw reticle
 	spr(
 		0,
-		player.pos.x+offset_x,
-		player.pos.y+offset_y
+		player.pos.x+(final_ret_vec.x*6),
+		player.pos.y+(final_ret_vec.y*6)
 	)
 end
 
@@ -476,16 +477,39 @@ function power_up_collbacks()
 		log("col")
 		-- handle event
 		if p.p_type == "health" then
-			log("has health")
 			player.health += 1
 			-- prevent too much health
 			if player.health > 3 then player.health = 3 end
 		else
-			log("has bomb")
+			player.bombs += 1
+			if player.bombs > 2 then player.bombs = 2 end
+			log(player.bombs)
 		end
 		-- deactivate powerup
 		p.active = false
 	end
+end
+
+------------------ score
+score = 00000
+
+function add_score(_add)
+ score+=_add
+end
+
+function dr_score()
+	local scr_string = pad(tostr(score), 6)
+	print(
+	 scr_string,
+	 player.pos.x - 8*6 - 3, 
+	 player.pos.y - 8*6 + 4,
+	 8
+	)
+end
+
+function pad(string,length)
+  if (#string==length) return string
+  return "0"..pad(string, length-1)
 end
 -->8
 -- enemies
@@ -494,7 +518,7 @@ enemies={}
 enemy_spd= 20/100
 enemy_spd_fast = enemy_spd*3
 -- start enemy pool
-for i=1, 20 do
+for i=1, 5 do
 	enemies[#enemies+1]={
 		--state
 	 pos={x=0,y=0},
@@ -618,8 +642,11 @@ function enemy_coll_backs()
 		-- set hit sprite
 		e.is_hit = true		
 		e.health-=1
+		-- handle death
 		if e.health < 0 then
 			e.active = false
+			-- add score
+			add_score(200)
 		end
 	end
 	--reset flags
@@ -632,9 +659,20 @@ function ui_player_health()
 	for i=1, player.health do
 		print(
 			"♥",
-			player.pos.x-(8*7)+4+(8*i),
+			player.pos.x-(8*8)+4+(8*i),
 			player.pos.y-(8*7)+4,
 			8
+		)
+	end
+end
+
+function ui_player_bomb()
+ for i=1, player.bombs do
+		print(
+		 "◆",
+			player.pos.x+(8*8)+4-(8*i),
+			player.pos.y-(8*7)+4,
+			12
 		)
 	end
 end
