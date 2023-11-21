@@ -2,7 +2,6 @@ pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
 -- main functions
-
 function _init()
 	-- init music
 	music(0)
@@ -19,6 +18,8 @@ function _update()
 	bullet_update()
 	enemy_update()
 	power_up_update()
+	shake_update()
+	emitters_update()
 	-- process collisions
 	bullet_cull()
 	enemy_coll_backs()
@@ -41,20 +42,22 @@ function _draw()
 	-- draw map
 	map()
 	camera(
-		player.pos.x-64+8,
-		player.pos.y-64+8
+		player.pos.x-64+8+shake_offs.x,
+		player.pos.y-64+8+shake_offs.y
 	)
 	-- draw game objects
 	player_draw()
 	bullet_draw()
 	enemies_draw()
 	power_up_draw()
+	emitters_draw()
 	--ui
 	ui_player_health()
 	ui_player_bomb()
 	dr_score()
 	-- logging
 	log_draw()
+	--arc(player.pos.x,player.pos.y,8,0,0.5,7)
 end
 
 
@@ -195,6 +198,43 @@ end
 
 
 
+
+
+----------- extra drawing tools
+
+function arc(x, y, r, ang1, ang2, c)
+ if ang1 < 0 or ang2 < 0 or ang1 >= 1 or ang2 > 1 then return end
+ if ang1 > ang2 then
+  arc(x, y, r, ang1, 1, c)
+  arc(x, y, r, 0, ang2, c)
+  return
+ end
+ for i = 0, .75, .25 do
+  local a = ang1
+  local b = ang2
+  if a > i + .25 then goto next end
+  if b < i then goto next end
+  if a < i then a = i end
+  if b > i + .25 then b = i + .25 end
+  local x1 = x + r * cos(a)
+  local y1 = y + r * sin(a)
+  local x2 = x + r * cos(b)
+  local y2 = y + r * sin(b)
+  local cx1 = min(x1, x2)
+  local cx2 = max(x1, x2)
+  local cy1 = min(y1, y2)
+  local cy2 = max(y1, y2)
+  clip(cx1, cy1, cx2 - cx1 + 2, cy2 - cy1 + 2)
+  circ(x, y, r, c)
+  clip()
+  ::next::
+ end
+end
+
+
+
+
+
 -->8
 -- player stuff
 
@@ -311,6 +351,7 @@ end
 player_invul_time = 0
 function player_damage()
 	if player_invul_time < 0 then
+		shake()
 		player.health -= 1
 		player_invul_time = 3
 		if player.health == 0 then
@@ -642,6 +683,8 @@ function enemy_coll_backs()
 		-- set hit sprite
 		e.is_hit = true		
 		e.health-=1
+		-- emit partices
+		emit(e.pos.x, e.pos.y)
 		-- handle death
 		if e.health < 0 then
 			e.active = false
@@ -674,6 +717,113 @@ function ui_player_bomb()
 			player.pos.y-(8*7)+4,
 			12
 		)
+	end
+end
+
+-->8
+--fx
+
+----------screen shake
+shake_ints=6
+curr_shake=0
+shake_offs={x=0, y=0}
+function shake()
+	curr_shake = shake_ints
+end
+
+function shake_update()
+	--lerp the intensity
+	curr_shake = lerp(curr_shake, 0, 0.1)
+	--create offset
+	shake_offs.x=(rnd()*curr_shake)-2
+	shake_offs.y=(rnd()*curr_shake)-2
+end
+
+
+-----------------------particles
+emitters={}
+curr_em_i = 1
+-- create emitters
+for i=1, 20 do
+	-- create emitter
+	local e = {
+		pos={x=0,y=0},
+		active=false,
+		lifespan=0,
+		particles={},
+		sprite=91
+	}
+	-- create particles
+	for ep=1, 5 do
+		local party = {
+			pos={x=0, y=0},
+			active=false,
+			dir={x=0,y=0},
+			vel=0
+		}
+		e.particles[#e.particles+1]=party
+	end
+	emitters[#emitters+1]=e
+end
+
+function emit(_x, _y)
+	-- get available emitter
+	local e = emitters[curr_em_i]
+	-- set emitter position
+	e.pos = {x=_x, y=_y}
+	-- activate emitter 
+	e.active = true
+	e.lifespan = 0.2
+	-- activate all particles
+	for i=1, #e.particles do
+		local p = e.particles[i]
+		p.active = true
+		p.pos = {x=0, y=0}
+		p.vel = rnd()*5
+		p.dir={
+			x=(rnd()*2)-1,
+			y=(rnd()*2)-1
+		}
+	end			
+	--iterate emitter index
+	curr_em_i += 1
+	if curr_em_i > #emitters then curr_em_i = 1 end
+end
+
+function emitters_update()
+	for i=1, #emitters do
+		local e = emitters[i]
+		if e.active then
+			-- handle lifespan
+			e.lifespan -= clock.delta
+			if e.lifespan < 0 then e.active = false end
+			for ep=1, #e.particles do
+				local party = e.particles[ep] 
+				-- lerp velocity to zero
+				party.vel = lerp(party.vel,0,0.3)
+				-- move particle
+				party.pos.x += party.dir.x*party.vel
+				party.pos.y += party.dir.y*party.vel
+			end
+		end
+	end
+end
+
+function emitters_draw()
+	for i=1, #emitters do
+		local e = emitters[i]
+		if e.active then
+			for ep=1, #e.particles do
+				local party = e.particles[ep]
+				if party.active then
+					spr(
+						e.sprite,
+						e.pos.x+party.pos.x,
+						e.pos.y+party.pos.y
+					)
+				end 
+			end
+		end
 	end
 end
 
@@ -720,10 +870,10 @@ bbbb3bbb03bbbb3043033b34030330300303000000000100cccccccccbccccccbcc3ccc444444444
 0006060006000000000000000010100040d22d2100404000080020000b003000004040000401222105006060000000000000000000000000000000000015d600
 15d561655555555501d15d1007ffff100077710000000000000000000000000000000000000000000000000000000000000000000000000000000000cccccc6c
 15d5656566666666156666517f0151f10766651000000000000000000000000000000000000000000000000000000000000000000004400000000000cc77cccc
-1565657515555555d655d56d6f5606f57671765100000000000000000000000000000000000000000000000000000000000000000049940000000000c6cc6ccc
-15d565656666666666d0056d5f0565f16615166100000000000000000000000000000000000000000000000000000000000000000497a9400014d9906cccc6cc
-15d1656555551555d6500d666f5606f5766d66510000000000000000000000000000000000000000000000000000000000000000049aa940114daa78cc6ccccc
-15d57565ddddddd6d65d556d5f0565f1666d66110000000000000000000000000000000000000000000000000000000000000000004994000014d980ccccc77c
+1565657515555555d655d56d6f5606f57671765100000000000000000000000000000000000000000000000000009000000000000049940000000000c6cc6ccc
+15d565656666666666d0056d5f0565f1661516610000000000000000000000000000000000000000000000000099a000000000000497a9400014d9906cccc6cc
+15d1656555551555d6500d666f5606f5766d66510000000000000000000000000000000000000000000000000009990000000000049aa940114daa78cc6ccccc
+15d57565ddddddd6d65d556d5f0565f1666d66110000000000000000000000000000000000000000000000000009000000000000004994000014d980ccccc77c
 15d575655555555515666651fdffffdf7667665100000000000000000000000000000000000000000000000000000000000000000004400000000000c7cc6cc6
 01d565651111111001dd6d100111111015555510000000000000000000000000000000000000000000000000000000000000000000000000000000006c6ccccc
 a999999a0a997a900a999990949499aa00000a000a00000000999900282828281988889200000000000000000000000000000000000000000000000000000000
