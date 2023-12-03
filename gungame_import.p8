@@ -20,6 +20,7 @@ function _update()
 	power_up_update()
 	shake_update()
 	emitters_update()
+	bomb_update()
 	-- process collisions
 	bullet_cull()
 	enemy_coll_backs()
@@ -46,6 +47,7 @@ function _draw()
 		player.pos.y-64+8+shake_offs.y
 	)
 	-- draw game objects
+	bomb_draw()
 	player_draw()
 	bullet_draw()
 	enemies_draw()
@@ -197,47 +199,9 @@ function lerp(a, b, t)
 end
 
 
-
-
-
------------ extra drawing tools
-
-function arc(x, y, r, ang1, ang2, c)
- if ang1 < 0 or ang2 < 0 or ang1 >= 1 or ang2 > 1 then return end
- if ang1 > ang2 then
-  arc(x, y, r, ang1, 1, c)
-  arc(x, y, r, 0, ang2, c)
-  return
- end
- for i = 0, .75, .25 do
-  local a = ang1
-  local b = ang2
-  if a > i + .25 then goto next end
-  if b < i then goto next end
-  if a < i then a = i end
-  if b > i + .25 then b = i + .25 end
-  local x1 = x + r * cos(a)
-  local y1 = y + r * sin(a)
-  local x2 = x + r * cos(b)
-  local y2 = y + r * sin(b)
-  local cx1 = min(x1, x2)
-  local cx2 = max(x1, x2)
-  local cy1 = min(y1, y2)
-  local cy2 = max(y1, y2)
-  clip(cx1, cy1, cx2 - cx1 + 2, cy2 - cy1 + 2)
-  circ(x, y, r, c)
-  clip()
-  ::next::
- end
-end
-
-
-
-
-
+--------------
 -->8
 -- player stuff
-
 -- player var
 player={
 	-- vars
@@ -306,6 +270,9 @@ function player_update()
 		end
 	end
 	-- bomb use
+	if(btnp(4) and btnp(5)) then
+		create_bomb(player.pos.x, player.pos.y)
+	end
 	-- player invul
 	player_invul_time -= clock.delta
 end
@@ -531,6 +498,69 @@ function power_up_collbacks()
 	end
 end
 
+
+
+
+
+----------------------------bomb
+bomb = { -- only one bomb
+ active=false,
+ pos={x=0,y=0},
+ lifespan=0
+}
+function create_bomb(_x, _y)
+	if bomb.active == false and player.bombs > 0 then
+		-- deplete one bomb
+		player.bombs-=1
+		-- create bomb
+		bomb.pos.x = _x
+		bomb.pos.y = _y
+		bomb.active = true
+		bomb.lifespan=1
+	end
+end
+function bomb_update()
+	-- just delay lifespan
+	if bomb.active then
+		bomb.lifespan -= clock.delta
+		if bomb.lifespan < 0 then
+			-- if lifespan runs out
+			-- bomb boom
+			bomb.active = false
+			bomb_boom()
+		end
+	end
+end
+b_flash_colors={
+	8,8,8,
+	0,0,0,
+	9,9,9,
+	0,0,0,
+	10,10,10,
+	0,0,0
+} 
+curr_flash_index = 0
+function bomb_draw()
+	if(bomb.active) then
+		spr(114, bomb.pos.x, bomb.pos.y)
+	end
+	if(curr_flash_index > 0) then
+		curr_flash_index -= 1
+		cls(b_flash_colors[#b_flash_colors-(curr_flash_index-1)])
+	end
+end
+function bomb_boom()
+	--set bomb fx
+	curr_flash_index = #b_flash_colors
+	-- clear all enemies
+	for i=1, #enemies do
+		local e = enemies[i]
+		e.active = false
+	end
+end
+
+
+
 ------------------ score
 score = 00000
 
@@ -552,6 +582,9 @@ function pad(string,length)
   if (#string==length) return string
   return "0"..pad(string, length-1)
 end
+
+
+
 -->8
 -- enemies
 -- enemies has slow-tough and fast-weak types
