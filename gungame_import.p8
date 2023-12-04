@@ -29,13 +29,7 @@ end
 
 function _draw()
 	if game_over then
-		cls(2)
-		print(
-			"game over",
-			-- note this is not centered lmao
-			player.pos.x-(8),
-			player.pos.y+(8)
-		)
+		game_over_draw()
 		return null
 	end
 	-- cls
@@ -753,6 +747,38 @@ function ui_player_bomb()
 	end
 end
 
+
+
+
+--------------- game over screen
+function game_over_draw()
+		cls(2)
+		print(
+			"game over",
+			-- note this is not centered lmao
+			player.pos.x-(8*1)-2,
+			player.pos.y+(8*0),
+			8
+		)
+				print(
+			"score:",
+			player.pos.x-(8*2),
+			player.pos.y+(8*1),
+			7
+		)
+		print(
+			pad(tostr(score), 6),
+			player.pos.x-(8*-1),
+			player.pos.y+(8*1),
+			7
+		)
+		print(
+			"press start",
+			player.pos.x-(8*1)-6,
+			player.pos.y+(8*2),
+			8
+		)
+end
 -->8
 --fx
 
@@ -771,6 +797,8 @@ function shake_update()
 	shake_offs.x=(rnd()*curr_shake)-2
 	shake_offs.y=(rnd()*curr_shake)-2
 end
+
+
 
 
 -----------------------particles
