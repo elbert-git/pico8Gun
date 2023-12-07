@@ -20,7 +20,8 @@ function _update()
 	power_up_update()
 	shake_update()
 	emitters_update()
-	bomb_update()
+	bomb_update();
+	tutorial_update()
 	-- process collisions
 	bullet_cull()
 	enemy_coll_backs()
@@ -47,6 +48,7 @@ function _draw()
 	enemies_draw()
 	power_up_draw()
 	emitters_draw()
+	tutorial_draw()
 	--ui
 	ui_player_health()
 	ui_player_bomb()
@@ -891,6 +893,63 @@ function emitters_draw()
 				end 
 			end
 		end
+	end
+end
+
+-->8
+-- tutorial stuff
+
+function tutorial_update()
+	door_update()
+	tut_p_up_update()
+end
+
+function tutorial_draw()
+	door_draw()
+	tut_p_up_draw()
+end
+
+
+--------------------------- door
+door = {
+	thresh=44*8,
+	active=true
+}
+function door_update()
+	if btn(4) then door.active = false end
+	if door.active then
+		-- prevent player from leaving
+		if(player.pos.y < door.thresh) then
+			player.pos.y = door.thresh
+		end	
+	end
+end
+function door_draw()
+	if door.active then
+		spr(59, 90*8, 43*8)
+		spr(59, 91*8, 43*8)
+	end
+end
+
+------------------- tut power-up 
+tut_p_up = {
+	pos={x=90*8, y=50*8},
+	active=true
+}
+function tut_p_up_update()
+	if obj_collide(player, tut_p_up) and tut_p_up.active then 
+		player.bombs += 1
+		tut_p_up.active = false
+		sfx(7)
+	end
+end
+function tut_p_up_draw()
+	if tut_p_up.active then
+		spr(
+			114,
+			tut_p_up.pos.x,
+			tut_p_up.pos,y	
+		)
 	end
 end
 
