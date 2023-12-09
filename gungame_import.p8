@@ -243,6 +243,8 @@ function player_update()
 	-- shooting
 	if btn(4) then
 		if b_down_time < 0 then
+			--iterate tutorial
+			iter_tut_prompt(2)
 			-- handle bullet down time
 			b_down_time = b_rate
 			-- calc bullet directions
@@ -258,6 +260,9 @@ function player_update()
 	end
 	-- switch shooting direction
 	if btnp(5) then
+		--iterate tut
+		iter_tut_prompt(3)
+		--switch direciton
 		if player.sht_fwd then
 			player.sht_fwd = false
 			ret_ang = 0.5
@@ -549,6 +554,9 @@ function bomb_draw()
 	end
 end
 function bomb_boom()
+	--tut hooks
+	iter_tut_prompt(4)
+	start_game()
 	--set bomb fx
 	sfx(9)
 	curr_flash_index = #b_flash_colors
@@ -907,6 +915,7 @@ end
 function tutorial_draw()
 	door_draw()
 	tut_p_up_draw()
+	tut_prompts_draw()
 end
 
 
@@ -916,7 +925,6 @@ door = {
 	active=true
 }
 function door_update()
-	if btn(4) then door.active = false end
 	if door.active then
 		-- prevent player from leaving
 		if(player.pos.y < door.thresh) then
@@ -938,6 +946,7 @@ tut_p_up = {
 }
 function tut_p_up_update()
 	if obj_collide(player, tut_p_up) and tut_p_up.active then 
+		iter_tut_prompt(3)
 		player.bombs += 1
 		tut_p_up.active = false
 		sfx(7)
@@ -948,9 +957,43 @@ function tut_p_up_draw()
 		spr(
 			114,
 			tut_p_up.pos.x,
-			tut_p_up.pos,y	
+			tut_p_up.pos.y
 		)
 	end
+end
+
+
+--------------- tutorial prompts
+
+tut_prompts = {
+	{"press ❎ to shoot"},
+	{"press 🅾️ to switch","    directions"},
+	{"press ❎🅾️ ","together to super move"},
+	{""}
+}
+tut_prompts_i = 1
+function tut_prompts_draw()
+	local arr=tut_prompts[tut_prompts_i]	
+	for i=1, #arr do
+		if(i == 1) then 
+			print(arr[i], 87*8, 50*9)
+		else
+			print(arr[i])
+		end
+	end
+end
+function iter_tut_prompt(val)
+	if(val > tut_prompts_i) then
+		tut_prompts_i = val
+	end
+end
+
+-- this function is called 
+-- to signal end of tutorial
+function start_game()
+	-- disable door
+	door.active = false
+	-- start enemies and powerups
 end
 
 __gfx__
