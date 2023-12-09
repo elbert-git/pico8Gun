@@ -2,13 +2,24 @@ pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
 -- main functions
+
+-------------------- game states
+game_over = false
+game_state="tut"
+-- states are
+-- tut
+-- started
+-- over
+
+--------------------- main loops
+
 function _init()
 	-- init music
 	music(0)
 end
 
 function _update()
-	if game_over then
+	if game_state == "over" then
 		return 0	
 	end
 	--time 
@@ -29,7 +40,7 @@ function _update()
 end
 
 function _draw()
-	if game_over then
+	if game_state=="over" then
 		game_over_draw()
 		return null
 	end
@@ -59,8 +70,6 @@ function _draw()
 end
 
 
-------- game states
-game_over = false
 
 
 
@@ -72,7 +81,7 @@ game_over = false
 
 
 
-----------collision-------
+---------------------- collision
 function collide(o, flag)
 	local x1=o.pos.x/8
 	local y1=o.pos.y/8
@@ -109,7 +118,7 @@ end
 
 
 
---------- clock stuff
+-------------------- clock stuff
 clock={
 	delta=0,
 	prev_time=0
@@ -129,7 +138,7 @@ end
 
 
 
------- logging
+------------------------ logging
 logging = true
 logging_size = 8
 log_msgs={}
@@ -158,7 +167,7 @@ end
 
 
 
------- math utilities
+----------------- math utilities
 pi = 22/7
 
 function rot_vec(vec, ang)
@@ -195,7 +204,20 @@ function lerp(a, b, t)
 end
 
 
---------------
+--------------- random utilities
+function is_pos_outside(pos)
+	-- check x
+	local x_outside = false
+	if pos.x < (74*8)+8 or pos.x > 107*8 then
+		x_outside = true
+	end 
+	-- check y
+	local y_outside = false 
+	if pos.y > (42*8) or pos.y < (14*8)+8 then
+		x_outside = true
+	end
+	return x_outside or y_outside
+end
 -->8
 -- player stuff
 -- player var
@@ -214,6 +236,7 @@ player={
 }
 
 function player_update()
+	log(is_pos_outside(player.pos))
 	-- movement and reticle
 	local o_pos = {x=player.pos.x, y=player.pos.y}
 	if btn(0) then
@@ -316,7 +339,7 @@ function dr_ret()
 	)
 end
 
---------- player damage
+------------------ player damage
 player_invul_time = 0
 function player_damage()
 	if player_invul_time < 0 then
@@ -325,7 +348,7 @@ function player_damage()
 		player.health -= 1
 		player_invul_time = 3
 		if player.health == 0 then
-			game_over = true
+			game_state = "over"
 			music(-1)
 			sfx(4)
 		end
@@ -333,7 +356,7 @@ function player_damage()
 end
 
 
-------------- bullet stuff
+------------------- bullet stuff
 bullets={}
 b_spd = 4
 b_down_time = 0
@@ -403,7 +426,7 @@ function bullet_cull()
 	end
 end
 
---------------- power ups
+---------------------- power ups
 power_ups = {}
 ----- create power ups
 for i=1, 5 do
@@ -422,6 +445,7 @@ p_spn_timer = p_spn_rate
 p_spn_dist = 8*7
 p_l_span = 13
 function spn_p_ups_loop()
+	if(game_state != "started") then return end
 	-- iterate timer
 	p_spn_timer -= clock.delta
 	-- if is time then spawn
@@ -430,11 +454,15 @@ function spn_p_ups_loop()
 		for i=1, #power_ups do
 			local p = power_ups[i]
 			if p.active == false then
-				-- create position
-				local pos={
-					x=(((rnd()*2)-1)*p_spn_dist)+player.pos.x,
-					y=(((rnd()*2)-1)*p_spn_dist)+player.pos.y
-				}
+				local pos = {x=0, y=0}
+				-- prevent outside spawn
+				while(is_pos_outside(pos)) do
+					-- create position
+					pos={
+						x=(((rnd()*2)-1)*p_spn_dist)+player.pos.x,
+						y=(((rnd()*2)-1)*p_spn_dist)+player.pos.y
+					}				
+				end
 				-- choose type
 				local _type = "health"
 				if rnd() > 0.5 then _type ="bomb" end
@@ -506,7 +534,7 @@ end
 
 
 
-----------------------------bomb
+--------------------------- bomb
 bomb = { -- only one bomb
  active=false,
  pos={x=0,y=0},
@@ -555,8 +583,8 @@ function bomb_draw()
 end
 function bomb_boom()
 	--tut hooks
-	iter_tut_prompt(4)
-	start_game()
+	iter_tut_prompt(5)
+	door_open()
 	--set bomb fx
 	sfx(9)
 	curr_flash_index = #b_flash_colors
@@ -569,7 +597,7 @@ end
 
 
 
------------------- score
+-------------------------- score
 score = 00000
 
 function add_score(_add)
@@ -610,7 +638,8 @@ for i=1, 5 do
 	 --props
 	 sprite=64,
 	 sprite_hit=65,
-	 is_fast=false
+	 is_fast=false,
+	 tut=false
 	}
 end
 
@@ -625,21 +654,27 @@ function activate_enemies()
 			 _is_fast = false
 			end
 			-- create enemy position
-			local min_d = 8*2
-			local d = 8*4
-			local epos = {
-				x=(rnd()*2)-1,
-				y=(rnd()*2)-1
-			}
-			local epos_nrm = norm_vec(epos)
-			local epos_scl = {
-				x=player.pos.x+epos_nrm.x * (rnd(d)+min_d),
-				y=player.pos.y+epos_nrm.y * (rnd(d)+min_d)
-			}	
+			epos_scl = {x=0, y=0}
+			min_d = 8*2
+			d = 8*4
+			while is_pos_outside(epos_scl) do
+				local epos = {
+					x=(rnd()*2)-1,
+					y=(rnd()*2)-1
+				}
+				local epos_nrm = norm_vec(epos)
+				epos_scl = {
+					x=player.pos.x+epos_nrm.x * (rnd(d)+min_d),
+					y=player.pos.y+epos_nrm.y * (rnd(d)+min_d)
+				}		
+				log(epos_scl)
+			end
+			-- set enemy vars	
 			e.pos = epos_scl
 			e.active = true
 			e.health = 9
 			e.sprite = 64
+			e.tut = false
 			-- create faster enemies
 			if _is_fast then
 				e.is_fast = true
@@ -669,6 +704,7 @@ end
 enemy_spawn_rate=1
 enemy_timer=enemy_spawn_rate
 function enem_spawn_loop()
+	if game_state != "started" then return end 
 	--create enemies
 	if enemy_timer < 0 then
 		activate_enemies()
@@ -686,6 +722,17 @@ function enemy_update()
 	for i=1, #enemies do
 		local e = enemies[i]
 		if e.active then
+			-- flag for collision
+			for bi=1, #bullets do
+				local b = bullets[bi]
+				if b.active then
+					if obj_collide(b, e) then
+						enemy_colls[#enemy_colls+1] = i
+					end
+				end
+			end
+			-- skip for loop if tut
+			if e.tut then goto continue end
 			-- handle speed
 			local e_spd = enemy_spd
 			if e.is_fast then e_spd = enemy_spd_fast end
@@ -701,15 +748,7 @@ function enemy_update()
 				x=e.pos.x+(dir.x*e_spd),
 				y=e.pos.y+(dir.y*e_spd)
 			}
-			-- flag for collision
-			for bi=1, #bullets do
-				local b = bullets[bi]
-				if b.active then
-					if obj_collide(b, e) then
-						enemy_colls[#enemy_colls+1] = i
-					end
-				end
-			end
+			::continue:: -- this is marker to skip for loop
 		end
 	end
 end
@@ -906,7 +945,6 @@ end
 
 -->8
 -- tutorial stuff
-
 function tutorial_update()
 	door_update()
 	tut_p_up_update()
@@ -922,22 +960,46 @@ end
 --------------------------- door
 door = {
 	thresh=44*8,
-	active=true
+	forward_active=true,
+	backward_active=false,
 }
 function door_update()
-	if door.active then
-		-- prevent player from leaving
+	-- prevent player from leaving
+	if door.forward_active then
 		if(player.pos.y < door.thresh) then
 			player.pos.y = door.thresh
 		end	
 	end
+	-- close door when player has extied
+	if player.pos.y < 42*8 
+					and door.forward_active == false 
+					and door.backward_active == false
+				then
+		door_close()
+		game_state = "started"
+	end 
+	-- prevent player from entering again
+	if door.backward_active then
+		if (player.pos.y > door.thresh-8*2) then
+			player.pos.y = door.thresh-8*2
+		end 
+	end
 end
 function door_draw()
-	if door.active then
+	if door.forward_active or door.backward_active then
 		spr(59, 90*8, 43*8)
 		spr(59, 91*8, 43*8)
 	end
 end
+function door_open()
+	sfx(10)
+	door.forward_active = false
+end 
+function door_close()
+	sfx(10)
+	door.backward_active = true
+end
+
 
 ------------------- tut power-up 
 tut_p_up = {
@@ -946,7 +1008,7 @@ tut_p_up = {
 }
 function tut_p_up_update()
 	if obj_collide(player, tut_p_up) and tut_p_up.active then 
-		iter_tut_prompt(3)
+		iter_tut_prompt(4)
 		player.bombs += 1
 		tut_p_up.active = false
 		sfx(7)
@@ -968,6 +1030,7 @@ end
 tut_prompts = {
 	{"press ❎ to shoot"},
 	{"press 🅾️ to switch","    directions"},
+	{""},
 	{"press ❎🅾️ ","together to super move"},
 	{""}
 }
@@ -978,7 +1041,7 @@ function tut_prompts_draw()
 		if(i == 1) then 
 			print(arr[i], 87*8, 50*9)
 		else
-			print(arr[i])
+			print(arr[i], 87*8, 50*9+(8*(i-1)))
 		end
 	end
 end
@@ -988,14 +1051,35 @@ function iter_tut_prompt(val)
 	end
 end
 
--- this function is called 
--- to signal end of tutorial
-function start_game()
-	-- disable door
-	door.active = false
-	-- start enemies and powerups
-end
 
+--------------- tutorial enemies
+
+function create_tut_enemies()
+	-- create initial enemy
+	local e1=enemies[1] 
+	e1.tut = true
+	e1.active = true
+	e1.pos = {x=90*8, y=52*8}
+	-- create caged enemies
+	local e_tut_pos ={
+		-- left cage
+		{x=86*8, y=45*8},
+		{x=86*8, y=46*8},
+		{x=88*8, y=47*8},
+		-- right cage		
+		{x=94*8, y=47*8},
+		--{x=95*8, y=46*8},
+		--{x=96*8, y=46*8},
+	}
+	for i=1, #e_tut_pos do
+		local pos = e_tut_pos[i]
+		local e = enemies[i+1]
+		e.pos = pos
+		e.active = true
+		e.tut = true
+	end
+end
+create_tut_enemies()
 __gfx__
 00000000d66666656665d6650666d660055101500000000005510551010101110550055055000555050000009900099010100000011100000000000000000000
 000000006d6dddd56d6566d66d5d6d1556d1056d00ddd0d050105010100010005dd15dd199505999995054502290222901001110100010100060006000d000d0
@@ -1172,6 +1256,7 @@ __sfx__
 00080000000042c062330643306733065320043100431004310040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004
 0004000024640382511d2411123104211022110010001200002000000000100001000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00030000246502c6502a650206501b6501965018650116500d6501a65023650216501c650176500b65007650086500c6500d6500e650056500665009650086500665006650066500565005650066500765007650
+000100000763007630076300c73006630066400665012650136501976013660177601366013660056500b75004650046500d7400464004630046300562005620066200671007610026100161001610016000b610
 __music__
 02 01020304
 00 01020344
