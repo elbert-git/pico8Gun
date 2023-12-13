@@ -34,6 +34,7 @@ function _update()
 	bomb_update();
 	tutorial_update()
 	ramp_diff_update()
+	score_update()
 	-- process collisions
 	bullet_cull()
 	enemy_coll_backs()
@@ -200,6 +201,14 @@ function norm_vec(vector)
  return res
 end
 
+function rnd_vec(mag)
+	local pos = {
+		x=((rnd()*2)-1)*(mag*8),
+		y=((rnd()*2)-1)*(mag*8)
+	}
+	return pos
+end
+
 function lerp(a, b, t)
  return a + (b - a) * t
 end
@@ -218,6 +227,40 @@ function is_pos_outside(pos)
 		x_outside = true
 	end
 	return x_outside or y_outside
+end
+
+--74-42
+--121-21
+
+function spn_in_box()
+	local pos = {
+	 x=42+(rnd(74-42)),
+	 y=21+(rnd(121-21))
+	}
+	return pos
+end
+
+-- creates a 
+--random spawn point
+--around player
+-- in level box 
+-- or around player
+function get_spn_pos()
+	local max_tries = 10
+	local tries = 0
+	local pos = {x=0,y=0}
+	while 
+		tries < max_tries and
+		is_pos_outside(pos) do
+			tries += 1
+			pos = rnd_vec(5)
+			pos.x += player.pos.x
+			pos.y += player.pos.y
+	end	
+	if tries >= max_tries then
+		pos = spn_in_box()
+	end
+	return pos
 end
 
 
@@ -322,10 +365,16 @@ function player_update()
 	player_invul_time -= clock.delta
 end
 
+invul_spr_bl=false
 function player_draw()
 	-- draw player
 	if player_invul_time > 0 then
-		spr(player.sprite-1, player.pos.x, player.pos.y)
+		if invul_spr_bl then
+			spr(player.sprite-1, player.pos.x, player.pos.y)
+			invul_spr_bl = false
+		else
+			invul_spr_bl = true
+		end
 	else
 		spr(player.sprite, player.pos.x, player.pos.y)
 	end
@@ -474,15 +523,8 @@ function spn_p_ups_loop()
 		for i=1, #power_ups do
 			local p = power_ups[i]
 			if p.active == false then
-				local pos = {x=0, y=0}
-				-- prevent outside spawn
-				while(is_pos_outside(pos)) do
-					-- create position
-					pos={
-						x=(((rnd()*2)-1)*p_spn_dist)+player.pos.x,
-						y=(((rnd()*2)-1)*p_spn_dist)+player.pos.y
-					}				
-				end
+				--create pos
+				local pos = get_spn_pos()
 				-- choose type
 				local _type = "health"
 				if rnd() > 0.5 then _type ="bomb" end
@@ -612,6 +654,7 @@ function bomb_boom()
 	-- clear all enemies
 	for i=1, #enemies do
 		local e = enemies[i]
+		if e.active then add_score(200) end
 		e.active = false
 	end
 end
@@ -624,14 +667,34 @@ score = 00000
 function add_score(_add)
 	sfx(12)
  score+=_add
+ --shake score
+ score_off+=2
+end
+
+score_off=0
+function score_update()
+	score_off -= 0.2
+	if(score_off < 0) then score_off = 0 end
 end
 
 function dr_score()
 	local scr_string = pad(tostr(score), 6)
 	print(
 	 scr_string,
-	 player.pos.x - 8*6 - 3, 
-	 player.pos.y - 8*6 + 4,
+	 player.pos.x - 8*6 - 3 + rnd(score_off), 
+	 player.pos.y - 8*6 + 4 + rnd(score_off)*1.3,
+	 10
+	)
+	print(
+	 scr_string,
+	 player.pos.x - 8*6 - 3 + rnd(score_off), 
+	 player.pos.y - 8*6 + 4 + rnd(score_off)*1.2,
+	 9
+	)
+	print(
+	 scr_string,
+	 player.pos.x - 8*6 - 3 + rnd(score_off), 
+	 player.pos.y - 8*6 + 4 + rnd(score_off),
 	 8
 	)
 end
@@ -680,22 +743,9 @@ function activate_enemies()
 			 _is_fast = false
 			end
 			-- create enemy position
-			epos_scl = {x=0, y=0}
-			min_d = 8*2
-			d = 8*4
-			while is_pos_outside(epos_scl) do
-				local epos = {
-					x=(rnd()*2)-1,
-					y=(rnd()*2)-1
-				}
-				local epos_nrm = norm_vec(epos)
-				epos_scl = {
-					x=player.pos.x+epos_nrm.x * (rnd(d)+min_d),
-					y=player.pos.y+epos_nrm.y * (rnd(d)+min_d)
-				}		
-			end
+			local pos = get_spn_pos()
 			-- set enemy vars	
-			e.pos = epos_scl
+			e.pos = pos
 			e.active = true
 			e.health = 9
 			e.sprite = 64
