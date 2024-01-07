@@ -275,7 +275,7 @@ function ramp_diff_update()
 			-- add more enemies
 			add_enemy_instance(false)
 			-- increase enemy speed
-			enemy_spd*=1.1
+			enemy_spd*=1.25
 			-- decrease power up timer
 			p_spn_rate*=0.8
 		end
@@ -653,7 +653,7 @@ function bomb_boom()
 	-- clear all enemies
 	for i=1, #enemies do
 		local e = enemies[i]
-		if e.active then add_score(200) end
+		if e.active then add_score(enemy_score) end
 		e.active = false
 	end
 end
@@ -711,6 +711,7 @@ end
 enemies={}
 enemy_spd= 20/100
 enemy_spd_fast = enemy_spd*3
+enemy_score = 1
 -- start enemy pool
 function add_enemy_instance()
 	enemies[#enemies+1]={
@@ -846,7 +847,7 @@ function enemy_coll_backs()
 		if e.health < 0 then
 			e.active = false
 			-- add score
-			add_score(200)
+			add_score(enemy_score)
 		end
 	end
 	--reset flags
