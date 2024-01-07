@@ -326,7 +326,10 @@ function player_update()
 		end
 	end
 	-- shooting
-	if btn(4) then
+		-- bomb use
+	if(btnp(4) and btnp(5)) then
+		create_bomb(player.pos.x, player.pos.y)
+	elseif btn(4) then
 		if b_down_time < 0 then
 			--iterate tutorial
 			iter_tut_prompt(2)
@@ -341,10 +344,10 @@ function player_update()
 			create_bullet(player.pos.x, player.pos.y, b_dir_a)
 			create_bullet(player.pos.x, player.pos.y, b_dir_b)
 			sfx(5)
-			end
-	end
+		end	
+
 	-- switch shooting direction
-	if btnp(5) then
+	elseif btnp(5) then
 		--iterate tut
 		iter_tut_prompt(3)
 		--switch direciton
@@ -356,10 +359,7 @@ function player_update()
 			ret_ang = 0
 		end
 	end
-	-- bomb use
-	if(btnp(4) and btnp(5)) then
-		create_bomb(player.pos.x, player.pos.y)
-	end
+
 	-- player invul
 	player_invul_time -= clock.delta
 end
@@ -664,7 +664,7 @@ end
 score = 00000
 
 function add_score(_add)
-	sfx(12)
+	if score > (32767-enemy_score) then return end
  score+=_add
  --shake score
  score_off+=2
